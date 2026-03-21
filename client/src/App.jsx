@@ -1,12 +1,15 @@
 import { Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import Navbar from "./components/Navbar";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Dashboard from "./pages/Dashboard";
 import DocumentScanner from "./pages/DocumentScanner";
 import GrievanceDraftsman from "./pages/GrievanceDraftsman";
 import SchemeFinder from "./pages/SchemeFinder";
 import VoiceAssistant from "./pages/VoiceAssistant";
-import DigiLockerHub from "./pages/DigiLockerHub";
+import JobFinder from "./pages/JobFinder";
+import History from "./pages/History";
+import NotFound from "./pages/NotFound";
 
 const pageTransition = {
   initial: { opacity: 0, y: 18 },
@@ -16,18 +19,14 @@ const pageTransition = {
 };
 
 function AnimatedPage({ children }) {
-  return (
-    <motion.div {...pageTransition}>
-      {children}
-    </motion.div>
-  );
+  return <motion.div {...pageTransition}>{children}</motion.div>;
 }
 
 export default function App() {
   const location = useLocation();
 
   return (
-    <>
+    <ErrorBoundary>
       <Navbar />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
@@ -36,9 +35,11 @@ export default function App() {
           <Route path="/grievance" element={<AnimatedPage><GrievanceDraftsman /></AnimatedPage>} />
           <Route path="/schemes" element={<AnimatedPage><SchemeFinder /></AnimatedPage>} />
           <Route path="/voice" element={<AnimatedPage><VoiceAssistant /></AnimatedPage>} />
-          <Route path="/digilocker" element={<AnimatedPage><DigiLockerHub /></AnimatedPage>} />
+          <Route path="/jobs" element={<AnimatedPage><JobFinder /></AnimatedPage>} />
+          <Route path="/history" element={<AnimatedPage><History /></AnimatedPage>} />
+          <Route path="*" element={<AnimatedPage><NotFound /></AnimatedPage>} />
         </Routes>
       </AnimatePresence>
-    </>
+    </ErrorBoundary>
   );
 }

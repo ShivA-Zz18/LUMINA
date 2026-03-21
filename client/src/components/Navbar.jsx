@@ -9,7 +9,8 @@ const NAV_LINKS = [
   { to: "/schemes", label: "Schemes", icon: "🎯" },
   { to: "/grievance", label: "Grievance", icon: "🖊️" },
   { to: "/voice", label: "Voice", icon: "🎤" },
-  { to: "/digilocker", label: "DigiLocker", icon: "🔗" },
+  { to: "/jobs", label: "Jobs", icon: "💼" },
+  { to: "/history", label: "History", icon: "📜" },
 ];
 
 export default function Navbar() {
@@ -45,11 +46,8 @@ export default function Navbar() {
               <Link
                 key={link.to}
                 to={link.to}
-                className={`relative px-3.5 py-2 rounded-lg text-sm font-medium no-underline transition-all duration-300
-                  ${active
-                    ? "text-white"
-                    : "text-[var(--text-secondary)] hover:text-white"
-                  }`}
+                className={`relative px-3 py-2 rounded-lg text-sm font-medium no-underline transition-all duration-300
+                  ${active ? "text-white" : "text-[var(--text-secondary)] hover:text-white"}`}
               >
                 {active && (
                   <motion.div
@@ -96,8 +94,7 @@ export default function Navbar() {
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors
                     ${location.pathname === link.to
                       ? "bg-purple-500/15 text-white"
-                      : "text-[var(--text-secondary)] hover:text-white hover:bg-white/3"
-                    }`}
+                      : "text-[var(--text-secondary)] hover:text-white hover:bg-white/3"}`}
                 >
                   <span>{link.icon}</span> {link.label}
                 </Link>

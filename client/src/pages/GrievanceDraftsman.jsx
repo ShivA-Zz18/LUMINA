@@ -26,13 +26,15 @@ export default function GrievanceDraftsman() {
     if (!context.trim()) return alert("Please enter the document context");
     setLoading(true);
     try {
-      const { data } = await axios.post("/api/grievance", {
+      const { data } = await axios.post("/api/ai/grievance", {
         documentContext: context,
         userIntent: intent,
         language,
       });
-      setResult(data.data);
-      setEditedDraft(data.data.draftLetter || "");
+      // Endpoint returns either { data: {...} } or {...} depending on caller
+      const result = data.data || data;
+      setResult(result);
+      setEditedDraft(result.draft_content || result.draftLetter || "");
     } catch (err) {
       alert(err.response?.data?.error || "Failed to generate draft");
     } finally {
@@ -132,7 +134,7 @@ export default function GrievanceDraftsman() {
                 <div className="flex items-center gap-2">
                   <PenLine size={16} className="text-purple-400" />
                   <h3 className="text-sm font-bold text-[var(--text-primary)]">
-                    {result.formatType?.toUpperCase()} Draft
+                    {(result.document_type || result.formatType || result.letterType || "DOCUMENT")?.toUpperCase()} Draft
                   </h3>
                   <span className="badge bg-purple-500/10 text-purple-400 border border-purple-500/15">Editable</span>
                 </div>
@@ -156,14 +158,30 @@ export default function GrievanceDraftsman() {
               />
             </GlassCard>
 
-            {/* Tips */}
-            {result.tips?.length > 0 && (
+            {/* Legal Citations */}
+            {result.key_sections_cited?.length > 0 && (
+              <GlassCard hover={false}>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-400/80 flex items-center gap-2 mb-3">
+                  <Lightbulb size={14} /> Relevant Legal Sections
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {result.key_sections_cited.map((section, i) => (
+                    <span key={i} className="badge bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-xs">
+                      {section}
+                    </span>
+                  ))}
+                </div>
+              </GlassCard>
+            )}
+
+            {/* Next Steps / Tips */}
+            {(result.next_steps || result.tips)?.length > 0 && (
               <GlassCard hover={false}>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400/80 flex items-center gap-2 mb-3">
-                  <Lightbulb size={14} /> Practical Tips
+                  <Lightbulb size={14} /> Next Steps
                 </h3>
                 <ul className="space-y-2">
-                  {result.tips.map((tip, i) => (
+                  {(result.next_steps || result.tips).map((tip, i) => (
                     <li key={i} className="text-sm text-[var(--text-secondary)] flex gap-2.5">
                       <span className="w-5 h-5 rounded-full bg-amber-500/10 text-amber-400 text-xs font-bold flex items-center justify-center shrink-0">
                         {i + 1}

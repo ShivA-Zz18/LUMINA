@@ -22,7 +22,7 @@ const CATEGORY_COLORS = {
 };
 
 export default function SchemeFinder() {
-  const [form, setForm] = useState({ age: "", income: "", occupation: "" });
+  const [form, setForm] = useState({ age: "", income: "", occupation: "", documentNumber: "" });
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [expanded, setExpanded] = useState(null);
@@ -93,6 +93,16 @@ export default function SchemeFinder() {
                   ))}
                 </select>
               </div>
+              <div>
+                <label>API Setu Check (Optional)</label>
+                <input
+                  id="scheme-document"
+                  type="text"
+                  placeholder="Ration/Aadhaar No."
+                  value={form.documentNumber}
+                  onChange={(e) => setForm({ ...form, documentNumber: e.target.value })}
+                />
+              </div>
             </div>
             <div className="flex justify-end">
               <button type="submit" disabled={loading} className="btn-primary flex items-center gap-2">
@@ -113,9 +123,14 @@ export default function SchemeFinder() {
                   Found <span className="text-purple-400 font-bold">{results.total}</span> eligible scheme{results.total !== 1 ? "s" : ""}
                 </p>
                 <div className="flex gap-2">
-                  {["age: " + results.profile.age, "₹" + Number(results.profile.income).toLocaleString()].map((t) => (
+                  {["Age: " + results.profile.age, "₹" + Number(results.profile.income).toLocaleString()].map((t) => (
                     <span key={t} className="badge bg-white/5 text-[var(--text-tertiary)] border border-white/5">{t}</span>
                   ))}
+                  {results.apiSetuVerified && (
+                     <span className="badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 flex items-center gap-1">
+                       ✅ BPL Verified
+                     </span>
+                  )}
                 </div>
               </div>
 
@@ -135,6 +150,9 @@ export default function SchemeFinder() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1.5">
                             <h3 className="text-base font-bold text-[var(--text-primary)]">{scheme.name}</h3>
+                            {scheme.verifiedBPL && (
+                                <span title="Verified by API Setu" className="text-xl">✅</span>
+                            )}
                             <span className={`badge ${cat.bg} ${cat.text} border ${cat.border} capitalize`}>
                               {scheme.category}
                             </span>

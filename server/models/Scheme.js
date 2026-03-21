@@ -23,6 +23,7 @@ const schemeSchema = new mongoose.Schema(
     nearestCenter: { type: String },
     nextSteps: [String],
     isActive: { type: Boolean, default: true },
+    lastUpdated: { type: Date, default: Date.now }
   },
   { timestamps: true }
 );

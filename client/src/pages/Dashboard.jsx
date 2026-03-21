@@ -1,139 +1,163 @@
 import { motion } from "framer-motion";
-import BigButton from "../components/BigButton";
-import { Shield, Wifi, AudioLines, ArrowDown } from "lucide-react";
+import { Shield, Briefcase, Mic, ArrowRight, ScanLine, FileText } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-const FEATURES = [
-  {
-    icon: <Shield size={22} className="text-emerald-400" />,
-    title: "Verified Sources",
-    desc: "Every answer traced back to official government portals with trust badges",
-  },
-  {
-    icon: <Wifi size={22} className="text-cyan-400" />,
-    title: "Offline-First PWA",
-    desc: "Works even with no internet — progressive web app with local caching",
-  },
-  {
-    icon: <AudioLines size={22} className="text-pink-400" />,
-    title: "Voice-First Design",
-    desc: "Speak in your regional dialect — powered by Bhashini & Web Speech API",
-  },
-];
+const SPRING_TRANSITION = { type: "spring", stiffness: 100, damping: 12 };
+
+// Card Component with 1px Gradient Border & True Glassmorphism
+const BentoCard = ({ children, className, layoutId, onClick, delay = 0 }) => (
+  <motion.div
+    layoutId={layoutId}
+    onClick={onClick}
+    initial={{ opacity: 0, scale: 0.95, y: 30 }}
+    animate={{ opacity: 1, scale: 1, y: 0 }}
+    transition={{ ...SPRING_TRANSITION, delay }}
+    whileHover={{ y: -8, scale: 1.02 }}
+    className={`relative rounded-2xl p-[1px] cursor-pointer overflow-hidden group shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] hover:shadow-[0_20px_50px_-15px_rgba(0,212,255,0.25)] transition-all duration-500 ${className}`}
+    style={{
+      background: "linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 100%)",
+    }}
+  >
+    {/* Inner Glass Layer */}
+    <div className="absolute inset-0 bg-gradient-to-br from-[#060b17]/95 to-[#040711]/95 backdrop-blur-3xl rounded-2xl" />
+    <div className="absolute inset-0 bg-white/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl" />
+    
+    <div className="relative h-full w-full rounded-[15px] p-6 md:p-8 flex flex-col justify-between z-10 transition-colors duration-500">
+      {children}
+    </div>
+  </motion.div>
+);
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+
   return (
-    <div className="page-container flex flex-col items-center">
+    <div className="relative min-h-screen bg-[#02040a] overflow-hidden text-white pt-10 pb-20 px-4 md:px-8 flex flex-col items-center">
+      
+      {/* ── Immersive Ambient Galaxy Background ── */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 flex items-center justify-center">
+        <div className="absolute top-[-10%] left-[-20%] w-[80vw] h-[80vw] rounded-full bg-[#00d4ff] opacity-10 blur-[150px] mix-blend-screen" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[70vw] h-[70vw] rounded-full bg-[#39ff14] opacity-[0.08] blur-[150px] mix-blend-screen" />
+        <div className="absolute top-[30%] left-[30%] w-[40vw] h-[40vw] rounded-full bg-purple-600 opacity-[0.05] blur-[120px] mix-blend-screen" />
+      </div>
+
       {/* ── Hero ─────────────────────────────────────────── */}
-      <div className="relative flex flex-col items-center text-center pt-6 pb-14 w-full max-w-3xl">
-        {/* Animated orbital circles */}
-        <div className="absolute top-0 w-72 h-72 md:w-96 md:h-96 pointer-events-none opacity-15">
-          <div className="absolute inset-0 rounded-full border border-purple-500/50 animate-spin-slow" />
-          <div className="absolute inset-6 rounded-full border border-cyan-400/40 animate-spin-slow" style={{ animationDirection: "reverse", animationDuration: "35s" }} />
-          <div className="absolute inset-12 rounded-full border border-pink-400/30 animate-spin-slow" style={{ animationDuration: "50s" }} />
-          <div className="absolute inset-[4.5rem] rounded-full border border-amber-400/20 animate-spin-slow" style={{ animationDirection: "reverse", animationDuration: "60s" }} />
-        </div>
-
-        {/* Logo */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.6, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.7, type: "spring" }}
-          className="relative z-10 mb-8"
-        >
-          <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-purple-600 via-violet-500 to-cyan-400 flex items-center justify-center text-4xl font-black text-white shadow-2xl shadow-purple-500/30 border border-white/10">
-            LB
-          </div>
-          <div className="absolute -inset-3 rounded-3xl bg-gradient-to-br from-purple-500 to-cyan-400 blur-2xl opacity-20 animate-glow-pulse" />
-        </motion.div>
-
-        {/* Headline */}
-        <motion.h1
-          className="text-4xl md:text-6xl font-extrabold mb-4 relative z-10 leading-tight"
-          initial={{ opacity: 0, y: 25 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.5 }}
-        >
-          Bridging the{" "}
-          <span className="gradient-text">Digital Divide</span>
-        </motion.h1>
-
-        <motion.p
-          className="text-[var(--text-secondary)] max-w-xl text-base md:text-lg relative z-10 leading-relaxed"
-          initial={{ opacity: 0, y: 25 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-        >
-          AI-powered accessibility for every citizen. Scan documents, find government schemes,
-          draft grievances, access DigiLocker — all in your language.
-        </motion.p>
-
-        {/* Scroll hint */}
-        <motion.div
-          className="mt-8 relative z-10"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-        >
-          <motion.div
-            animate={{ y: [0, 8, 0] }}
-            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-          >
-            <ArrowDown size={20} className="text-[var(--text-tertiary)]" />
-          </motion.div>
-        </motion.div>
-      </div>
-
-      {/* ── 5 Big Action Buttons ─────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 w-full max-w-5xl mb-16">
-        <BigButton icon="📄" label="Document Scanner" to="/scanner" color="cyan"   delay={1} />
-        <BigButton icon="🎯" label="Scheme Finder"    to="/schemes"  color="green"  delay={2} />
-        <BigButton icon="🎤" label="Voice Assistant"   to="/voice"    color="pink"   delay={3} />
-        <BigButton icon="🖊️" label="Grievance Draft"   to="/grievance" color="amber" delay={4} />
-        <BigButton icon="🔗" label="DigiLocker"       to="/digilocker" color="purple" delay={5} />
-      </div>
-
-      {/* ── Feature Highlights ───────────────────────────── */}
       <motion.div
-        className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-5xl"
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
+        transition={SPRING_TRANSITION}
+        className="relative z-10 flex flex-col items-center text-center max-w-4xl mb-14 mt-6"
       >
-        {FEATURES.map((f, i) => (
-          <motion.div
-            key={i}
-            className="glass-subtle p-6 flex flex-col gap-3 group hover:border-[var(--border-active)] transition-colors duration-300"
-            whileHover={{ y: -4 }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <div className="w-10 h-10 rounded-xl glass flex items-center justify-center group-hover:border-glow transition-shadow">
-              {f.icon}
-            </div>
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">{f.title}</h3>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{f.desc}</p>
-          </motion.div>
-        ))}
+        <div className="relative mb-6">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#00d4ff] to-[#39ff14] rounded-[24px] blur-xl opacity-30 animate-pulse" />
+          <div className="w-24 h-24 rounded-[24px] bg-[#060b17] border border-white/10 flex items-center justify-center relative z-10 shadow-[inset_0_0_30px_rgba(255,255,255,0.05)]">
+            <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-br from-[#00d4ff] to-[#39ff14] drop-shadow-[0_0_10px_rgba(0,212,255,0.4)]">
+              LB
+            </span>
+          </div>
+        </div>
+        
+        <h1 className="text-5xl md:text-7xl lg:text-8xl font-black mb-5 tracking-tighter leading-[1.1]">
+          Aether <span className="text-transparent bg-clip-text bg-gradient-to-br from-[#00d4ff] via-[#00a3ff] to-[#39ff14]">Glass</span>
+        </h1>
+        <p className="text-white/60 text-lg md:text-2xl max-w-2xl font-medium leading-relaxed">
+          AI-powered accessibility for every citizen. The most advanced digital bridge.
+        </p>
       </motion.div>
 
-      {/* ── Stats Strip ──────────────────────────────────── */}
-      <motion.div
-        className="mt-10 flex flex-wrap justify-center gap-6 md:gap-12"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.7 }}
-      >
-        {[
-          { value: "7+", label: "Govt Schemes" },
-          { value: "3", label: "Languages" },
-          { value: "5", label: "Document Types" },
-          { value: "PWA", label: "Offline Ready" },
-        ].map((s, i) => (
-          <div key={i} className="text-center">
-            <p className="text-2xl font-extrabold gradient-text">{s.value}</p>
-            <p className="text-xs text-[var(--text-tertiary)] font-medium mt-0.5">{s.label}</p>
+      {/* ── 4-Column Bento Grid ─────────────────────────── */}
+      <div className="relative z-10 w-full max-w-5xl grid grid-cols-1 md:grid-cols-4 gap-6 auto-rows-[250px]">
+        
+        {/* Scanner: Feature Hero (Span 2) */}
+        <BentoCard 
+          layoutId="scanner-card" 
+          className="md:col-span-2 md:row-span-2"
+          onClick={() => navigate('/scanner')}
+          delay={0.1}
+        >
+          {/* Subtle background glow specific to Scanner */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-[#00d4ff] opacity-5 blur-[100px] rounded-full pointer-events-none" />
+
+          <div className="flex flex-col h-full z-10">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#00d4ff]/10 to-transparent border border-[#00d4ff]/20 flex items-center justify-center text-[#00d4ff] mb-6 shadow-[inset_0_0_20px_rgba(0,212,255,0.1)] group-hover:scale-110 transition-transform duration-500">
+              <ScanLine size={36} strokeWidth={1.5} />
+            </div>
+            
+            <div className="mt-auto">
+              <h2 className="text-4xl font-extrabold mb-3 tracking-tight group-hover:text-[#00d4ff]/90 transition-colors">Multimodal Scanner</h2>
+              <p className="text-white/60 text-[17px] leading-relaxed max-w-[95%] mb-8 font-medium">
+                Upload images, PDFs or capture physical documents via camera. Our deep learning AI automatically simplifies dense jargon.
+              </p>
+              
+              <div className="inline-flex items-center gap-2 bg-[#00d4ff]/10 text-[#00d4ff] px-5 py-2.5 rounded-xl font-bold uppercase tracking-wide text-sm border border-[#00d4ff]/20 group-hover:bg-[#00d4ff]/20 transition-colors">
+                Initiate Scan <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
           </div>
-        ))}
-      </motion.div>
+        </BentoCard>
+
+        {/* Job Finder (Span 1) */}
+        <BentoCard 
+          layoutId="jobs-card" 
+          className="md:col-span-1 md:row-span-1"
+          onClick={() => navigate('/jobs')}
+          delay={0.2}
+        >
+          <div className="flex flex-col h-full">
+            <div className="w-14 h-14 rounded-2xl bg-[#ffaa00]/10 border border-[#ffaa00]/20 flex items-center justify-center text-[#ffaa00] mb-auto group-hover:scale-110 transition-transform duration-500">
+              <Briefcase size={26} strokeWidth={1.5} />
+            </div>
+            <div className="mt-4">
+              <h3 className="text-2xl font-bold mb-1.5">Job Finder</h3>
+              <p className="text-white/50 text-[15px] font-medium leading-relaxed">AI-matched employment roles</p>
+            </div>
+          </div>
+        </BentoCard>
+
+        {/* Voice Assistant (Span 1) */}
+        <BentoCard 
+          layoutId="voice-card" 
+          className="md:col-span-1 md:row-span-1"
+          onClick={() => navigate('/voice')}
+          delay={0.3}
+        >
+          <div className="flex flex-col h-full">
+            <div className="w-14 h-14 rounded-2xl bg-[#39ff14]/10 border border-[#39ff14]/20 flex items-center justify-center text-[#39ff14] shadow-[0_0_15px_rgba(57,255,20,0.1)] mb-auto group-hover:scale-110 transition-transform duration-500">
+              <Mic size={26} strokeWidth={1.5} />
+            </div>
+            <div className="mt-4">
+              <h3 className="text-2xl font-bold mb-1.5">Voice AI</h3>
+              <p className="text-white/50 text-[15px] font-medium leading-relaxed">Speak in native dialects</p>
+            </div>
+          </div>
+        </BentoCard>
+
+        {/* Scheme Finder (Span 2 var) */}
+        <BentoCard 
+          layoutId="schemes-card" 
+          className="md:col-span-2 md:row-span-1"
+          onClick={() => navigate('/schemes')}
+          delay={0.4}
+        >
+          <div className="flex items-center justify-between h-full bg-gradient-to-r from-purple-500/0 to-purple-500/5 hover:to-purple-500/10 transition-colors absolute inset-0 p-6 md:p-8">
+            <div className="flex flex-col h-full justify-between z-10 w-full">
+              <div className="w-14 h-14 rounded-2xl bg-[#a855f7]/10 border border-[#a855f7]/20 flex items-center justify-center text-[#a855f7] mb-auto group-hover:scale-110 transition-transform duration-500 shadow-[0_0_20px_rgba(168,85,247,0.15)]">
+                <Shield size={26} strokeWidth={1.5} />
+              </div>
+              <div className="flex justify-between items-end">
+                <div>
+                  <h3 className="text-3xl font-extrabold mb-1.5">Scheme Finder</h3>
+                  <p className="text-white/50 text-[15px] font-medium">Find eligible govt benefits</p>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-white/[0.03] border border-white/10 flex items-center justify-center group-hover:bg-[#a855f7]/20 group-hover:border-[#a855f7]/40 transition-all duration-300">
+                  <ArrowRight size={20} className="text-white group-hover:text-[#a855f7]" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </BentoCard>
+
+      </div>
     </div>
   );
 }
