@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -22,7 +22,13 @@ export default function DocumentScanner() {
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(""); // OCR progress
   const [result, setResult] = useState(null);
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(localStorage.getItem("lingo_lang") || "en");
+
+  useEffect(() => {
+    const handleLangChange = (e) => setLang(e.detail);
+    window.addEventListener("lingo_lang_change", handleLangChange);
+    return () => window.removeEventListener("lingo_lang_change", handleLangChange);
+  }, []);
   const [dragActive, setDragActive] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [error, setError] = useState("");

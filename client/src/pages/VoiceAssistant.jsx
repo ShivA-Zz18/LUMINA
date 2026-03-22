@@ -10,12 +10,23 @@ export default function VoiceAssistant() {
   const [messages, setMessages] = useState([
     {
       role: "bot",
-      text: "🙏 Namaste! I'm your Lingo-Bridge Voice Assistant.\n\nAsk me about:\n• Government schemes & eligibility\n• Document meanings & procedures\n• Your rights as a citizen\n• How to file RTI or grievances\n\nChoose your language and speak or type!",
+      text: "🙏 Namaste! I'm your Lumina Voice Assistant.\n\nAsk me about:\n• Government schemes & eligibility\n• Document meanings & procedures\n• Your rights as a citizen\n• How to file RTI or grievances\n\nChoose your language and speak or type!",
       timestamp: Date.now(),
     },
   ]);
   const [inputText, setInputText] = useState("");
-  const [lang, setLang] = useState("en-IN");
+  const getFullLangCode = (shortCode) => {
+    if (shortCode === "hi") return "hi-IN";
+    if (shortCode === "kn") return "kn-IN";
+    return "en-IN";
+  };
+  const [lang, setLang] = useState(getFullLangCode(localStorage.getItem("lingo_lang") || "en"));
+
+  useEffect(() => {
+    const handleLangChange = (e) => setLang(getFullLangCode(e.detail));
+    window.addEventListener("lingo_lang_change", handleLangChange);
+    return () => window.removeEventListener("lingo_lang_change", handleLangChange);
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -256,7 +267,12 @@ export default function VoiceAssistant() {
               {LANGUAGES.map((l) => (
                 <motion.button
                   key={l.code}
-                  onClick={() => setLang(l.code)}
+                  onClick={() => {
+                    setLang(l.code);
+                    const shortCode = l.code === "hi-IN" ? "hi" : l.code === "kn-IN" ? "kn" : "en";
+                    localStorage.setItem("lingo_lang", shortCode);
+                    window.dispatchEvent(new CustomEvent("lingo_lang_change", { detail: shortCode }));
+                  }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all border-none cursor-pointer ${

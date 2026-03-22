@@ -23,6 +23,12 @@ const openRouterClient = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
+/** GitHub Models Client — The ultimate unbreakable Free Tier fallback */
+const githubModelsClient = new OpenAI({
+  baseURL: 'https://models.inference.ai.azure.com',
+  apiKey: process.env.GITHUB_TOKEN,
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SYSTEM PROMPTS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -838,11 +844,32 @@ const aiProcess = async (req, res) => {
           resolvedProvider = 'huggingface';
           logger.info('Chat inference resolved via HuggingFace.');
         } catch (hfError) {
-          logger.warn(`HuggingFace inference failed: ${hfError.message}. Falling back to demo mode.`);
+          logger.warn(`HuggingFace inference failed: ${hfError.message}.`);
         }
       }
 
-      // 4. DEMO MODE — graceful final fallback.
+      // 4. GITHUB MODELS — ultimate unmetered fallback.
+      const githubToken = process.env.GITHUB_TOKEN;
+      if (!generatedReply && githubToken && githubToken !== 'ghp_your_github_token_here') {
+        try {
+          const githubCompletion = await githubModelsClient.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: CHAT_SYSTEM_PROMPT },
+              { role: 'user', content: inferencePrompt },
+            ],
+            max_tokens: 500,
+            temperature: 0.7,
+          });
+          generatedReply = githubCompletion.choices[0].message.content;
+          resolvedProvider = 'github';
+          logger.info('Chat inference resolved via GitHub Models (GPT-4o-mini).');
+        } catch (githubError) {
+          logger.warn(`GitHub Models inference failed: ${githubError.message}. Falling back to demo mode.`);
+        }
+      }
+
+      // 5. DEMO MODE — graceful final fallback.
       if (!generatedReply) {
         logger.info('All AI providers exhausted. Serving demo mode keyword-matched response.');
         generatedReply = resolveDemoChatResponse(text, language);
@@ -920,52 +947,14 @@ Draft the content natively in English, Hindi, and Kannada simultaneously. Return
 
     let rawAiDraftText = null;
 
-    // 1. GEMINI — primary for grievance drafting (superior formatting).
-    if (geminiApiKey && geminiApiKey !== 'your_gemini_api_key_here') {
-      try {
-        const geminiClient = new GoogleGenerativeAI(geminiApiKey);
-        const grievanceModel = geminiClient.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        const geminiResult = await grievanceModel.generateContent([
-          { text: GRIEVANCE_DRAFTING_PROMPT },
-          { text: grievanceUserMessage },
-        ]);
-        rawAiDraftText = geminiResult.response.text();
-        logger.info('Grievance drafting resolved via Gemini 2.0 Flash.');
-      } catch (geminiError) {
-        logger.warn(`Gemini grievance drafting failed: ${geminiError.message}. Trying Groq...`);
-      }
-    }
-
-    // 2. GROQ — fallback for grievance drafting.
-    if (!rawAiDraftText && groqApiKey && groqApiKey !== 'your_groq_key_here') {
-      try {
-        const groqClient = new Groq({ apiKey: groqApiKey });
-        const groqCompletion = await groqClient.chat.completions.create({
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            { role: 'system', content: GRIEVANCE_DRAFTING_PROMPT },
-            { role: 'user', content: grievanceUserMessage },
-          ],
-          max_tokens: 4096,
-          temperature: 0.7,
-        });
-        rawAiDraftText = groqCompletion.choices[0].message.content;
-        logger.info('Grievance drafting resolved via Groq fallback.');
-      } catch (groqError) {
-        logger.error(`Groq grievance drafting also failed: ${groqError.message}`);
-      }
-    }
-
-    // 3. OPENROUTER — emergency fallback (free-tier LLM, no daily token wall).
+    // 1. OPENROUTER — primary (free-tier Gemini 2.0, no daily token wall for user).
     const openRouterApiKey = process.env.OPENROUTER_API_KEY;
-    if (!rawAiDraftText && openRouterApiKey && openRouterApiKey !== 'YOUR_OPENROUTER_API_KEY') {
-      // Confirmed-live free models on OpenRouter (March 2026).
-      // Check https://openrouter.ai/models?q=free for the latest if these 404.
+    if (openRouterApiKey && openRouterApiKey !== 'YOUR_OPENROUTER_API_KEY') {
       const openRouterModels = [
+        'google/gemini-2.0-flash-lite-preview-02-05:free',
+        'google/gemma-3-27b-it:free',
         'meta-llama/llama-3.3-70b-instruct:free',
         'meta-llama/llama-3.2-3b-instruct:free',
-        'google/gemma-3-27b-it:free',
-        'google/gemma-3-12b-it:free',
       ];
       for (const orModel of openRouterModels) {
         try {
@@ -977,6 +966,8 @@ Draft the content natively in English, Hindi, and Kannada simultaneously. Return
               { role: 'user', content: grievanceUserMessage },
             ],
             response_format: { type: 'json_object' },
+            max_tokens: 4096,
+            temperature: 0.7,
           });
           rawAiDraftText = openRouterCompletion.choices[0]?.message?.content || null;
           if (rawAiDraftText) {
@@ -988,9 +979,66 @@ Draft the content natively in English, Hindi, and Kannada simultaneously. Return
             logger.warn(`OpenRouter model '${orModel}' returned 404. Trying next...`);
             continue;
           }
-          logger.error(`OpenRouter grievance fallback failed (${orModel}): ${openRouterError.message}`);
-          break;
+          logger.warn(`OpenRouter grievance fallback failed (${orModel}): ${openRouterError.message}`);
         }
+      }
+    }
+
+    // 2. GEMINI — secondary for grievance drafting.
+    if (!rawAiDraftText && geminiApiKey && geminiApiKey !== 'your_gemini_api_key_here') {
+      try {
+        const geminiClient = new GoogleGenerativeAI(geminiApiKey);
+        const grievanceModel = geminiClient.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const geminiResult = await grievanceModel.generateContent([
+          { text: GRIEVANCE_DRAFTING_PROMPT },
+          { text: grievanceUserMessage },
+        ]);
+        rawAiDraftText = geminiResult.response.text();
+        logger.info('Grievance drafting resolved via Gemini 2.0 Flash.');
+      } catch (geminiError) {
+        logger.warn(`Gemini grievance drafting failed: ${geminiError.message}.`);
+      }
+    }
+
+    // 3. GROQ — tertiary fallback.
+    if (!rawAiDraftText && groqApiKey && groqApiKey !== 'your_groq_key_here') {
+      try {
+        const groqClient = new Groq({ apiKey: groqApiKey });
+        const groqCompletion = await groqClient.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: GRIEVANCE_DRAFTING_PROMPT },
+            { role: 'user', content: grievanceUserMessage },
+          ],
+          response_format: { type: 'json_object' },
+          max_tokens: 4096,
+          temperature: 0.7,
+        });
+        rawAiDraftText = groqCompletion.choices[0].message.content;
+        logger.info('Grievance drafting resolved via Groq fallback.');
+      } catch (groqError) {
+        logger.error(`Groq grievance drafting also failed: ${groqError.message}`);
+      }
+    }
+
+    // 4. GITHUB MODELS — ultimate unbreakable fallback for JSON generation.
+    const githubToken = process.env.GITHUB_TOKEN;
+    if (!rawAiDraftText && githubToken && githubToken !== 'YOUR_GITHUB_TOKEN') {
+      try {
+        const githubCompletion = await githubModelsClient.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: GRIEVANCE_DRAFTING_PROMPT },
+            { role: 'user', content: grievanceUserMessage },
+          ],
+          response_format: { type: 'json_object' },
+        });
+        rawAiDraftText = githubCompletion.choices[0]?.message?.content || null;
+        if (rawAiDraftText) {
+          logger.info('Grievance drafting resolved via GitHub Models (gpt-4o-mini).');
+        }
+      } catch (githubError) {
+        logger.error(`GitHub Models grievance fallback failed: ${githubError.message}`);
       }
     }
 

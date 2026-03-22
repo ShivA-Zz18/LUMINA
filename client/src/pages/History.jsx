@@ -25,6 +25,27 @@ export default function History() {
     }
   };
 
+  const deleteItem = async (id, e) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this history item?")) return;
+    try {
+      await axios.delete(`/api/simplify/history/${id}`);
+      setHistory(prev => prev.filter((item) => item._id !== id));
+    } catch (err) {
+      alert("Failed to delete history item: " + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const clearAll = async () => {
+    if (!window.confirm("Are you sure you want to delete ALL your history? This will free up database storage and cannot be undone.")) return;
+    try {
+      await axios.delete("/api/simplify/history");
+      setHistory([]);
+    } catch (err) {
+      alert("Failed to clear history: " + (err.response?.data?.error || err.message));
+    }
+  };
+
   const formatDate = (d) => {
     const date = new Date(d);
     return date.toLocaleDateString("en-IN", {
@@ -47,9 +68,19 @@ export default function History() {
         <h1 className="text-2xl md:text-3xl font-bold mb-1">
           <span className="gradient-text">Scan History</span>
         </h1>
-        <p className="text-sm text-[var(--text-secondary)] mb-8">
-          Your previously simplified documents
-        </p>
+        <div className="flex items-center justify-between mb-8">
+          <p className="text-sm text-[var(--text-secondary)]">
+            Your previously simplified documents
+          </p>
+          {history.length > 0 && (
+            <button 
+              onClick={clearAll} 
+              className="text-xs font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 border border-red-500/20 cursor-pointer"
+            >
+              <Trash2 size={14} /> Clear All
+            </button>
+          )}
+        </div>
 
         {history.length === 0 ? (
           <div className="flex flex-col items-center py-16">
@@ -101,6 +132,13 @@ export default function History() {
                           <span className="text-xs text-[var(--text-tertiary)] flex items-center gap-1 ml-auto">
                             <Clock size={11} /> {formatDate(item.createdAt)}
                           </span>
+                          <button
+                            onClick={(e) => deleteItem(item._id, e)}
+                            className="text-red-400/70 hover:text-red-400 ml-2 p-1.5 rounded-md hover:bg-red-500/10 transition-colors cursor-pointer border-none bg-transparent"
+                            title="Delete this record"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                         <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
                           {truncate(item.simplifiedText)}

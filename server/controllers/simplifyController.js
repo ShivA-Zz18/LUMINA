@@ -11,6 +11,7 @@ const { Groq } = require("groq-sdk");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const mongoose = require("mongoose");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 const Tesseract = require("tesseract.js");
@@ -709,4 +710,57 @@ const getHistory = async (_req, res) => {
   }
 };
 
-module.exports = { upload, simplifyDocument, getHistory };
+// ═══════════════════════════════════════════════════════════
+// HELPER: Delete Single History Item
+// ═══════════════════════════════════════════════════════════
+const deleteHistory = async (req, res) => {
+  try {
+    console.log(`🗑️ HISTORY: Deleting record ${req.params.id}...`);
+    const result = await History.findByIdAndDelete(req.params.id);
+    if (!result) {
+      return res.status(404).json({ success: false, error: "History record not found" });
+    }
+    
+    // Optionally delete from disk
+    if (result.imageUrl) {
+      const imgPath = path.join(__dirname, "..", result.imageUrl);
+      if (fs.existsSync(imgPath)) {
+        try { fs.unlinkSync(imgPath); } catch (err) { console.warn(`Failed to delete image: ${err.message}`); }
+      }
+    }
+    
+    console.log(`✅ HISTORY: Deleted record ${req.params.id}`);
+    res.json({ success: true, message: "Record deleted" });
+  } catch (error) {
+    console.error(`❌ DELETE HISTORY ERROR: ${error.message}`);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// HELPER: Clear All History
+// ═══════════════════════════════════════════════════════════
+const clearHistory = async (req, res) => {
+  try {
+    console.log(`🗑️ HISTORY: Clearing all records...`);
+    const records = await History.find();
+    
+    for (const record of records) {
+      if (record.imageUrl) {
+        const imgPath = path.join(__dirname, "..", record.imageUrl);
+        if (fs.existsSync(imgPath)) {
+          try { fs.unlinkSync(imgPath); } catch (err) {}
+        }
+      }
+    }
+    
+    await History.deleteMany({});
+    console.log(`✅ HISTORY: Cleared all records`);
+    res.json({ success: true, message: "All history cleared" });
+  } catch (error) {
+    console.error(`❌ CLEAR HISTORY ERROR: ${error.message}`);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+module.exports = { upload, simplifyDocument, getHistory, deleteHistory, clearHistory };

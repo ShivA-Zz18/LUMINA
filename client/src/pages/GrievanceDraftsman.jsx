@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { motion } from "framer-motion";
@@ -16,7 +16,13 @@ export default function GrievanceDraftsman() {
   const location = useLocation();
   const [context, setContext] = useState(location.state?.context || "");
   const [intent, setIntent] = useState("grievance");
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState(localStorage.getItem("lingo_lang") || "en");
+
+  useEffect(() => {
+    const handleLangChange = (e) => setLanguage(e.detail);
+    window.addEventListener("lingo_lang_change", handleLangChange);
+    return () => window.removeEventListener("lingo_lang_change", handleLangChange);
+  }, []);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [editedDraft, setEditedDraft] = useState("");
@@ -31,16 +37,27 @@ export default function GrievanceDraftsman() {
         userIntent: intent,
         language,
       });
-      // Endpoint returns either { data: {...} } or {...} depending on caller
-      const result = data.data || data;
-      setResult(result);
-      setEditedDraft(result.draft_content || result.draftLetter || "");
+      const resultData = data.data || data;
+      setResult(resultData);
     } catch (err) {
       alert(err.response?.data?.error || "Failed to generate draft");
     } finally {
       setLoading(false);
     }
   };
+
+  // Switch editedDraft instantly when language changes or a new result is fetched
+  useEffect(() => {
+    if (result) {
+      if (language === "kn") {
+        setEditedDraft(result.draft_content_kannada || result.draftLetterKannada || result.draft_content || result.draftLetter || "");
+      } else if (language === "hi") {
+        setEditedDraft(result.draft_content_hindi || result.draftLetterHindi || result.draft_content || result.draftLetter || "");
+      } else {
+        setEditedDraft(result.draft_content_english || result.draftLetter || result.draft_content || "");
+      }
+    }
+  }, [language, result]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(editedDraft);
@@ -103,7 +120,11 @@ export default function GrievanceDraftsman() {
         <div className="flex items-end gap-4 flex-wrap mb-2">
           <div className="w-48">
             <label>Output Language</label>
-            <select id="grievance-language" value={language} onChange={(e) => setLanguage(e.target.value)}>
+            <select id="grievance-language" value={language} onChange={(e) => {
+              setLanguage(e.target.value);
+              localStorage.setItem("lingo_lang", e.target.value);
+              window.dispatchEvent(new CustomEvent("lingo_lang_change", { detail: e.target.value }));
+            }}>
               <option value="en">English</option>
               <option value="kn">ಕನ್ನಡ (Kannada)</option>
               <option value="hi">हिन्दी (Hindi)</option>

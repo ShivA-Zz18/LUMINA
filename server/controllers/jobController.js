@@ -3,7 +3,7 @@
 const NodeCache = require('node-cache');
 const { scrapeSarkariResultNaukri, scrapeIndGovtJobs } = require('../services/scraperService');
 const { aggregateJobs } = require('../services/aggregatorService');
-const { smartSummarizeJob } = require('../services/aiService');
+const { smartSummarizeJobBatch } = require('../services/aiService');
 const logger = require('../utils/logger');
 
 /** @type {NodeCache} In-memory cache for job results. TTL: 1 hour. */
@@ -97,32 +97,13 @@ const getJobs = async (req, res) => {
     const jobBatchForInference = aggregatedJobPayloads.slice(0, 12);
     logger.info(`Dispatching ${jobBatchForInference.length} jobs to the AI summarization pipeline...`);
 
-    const summarizedJobResults = [];
-
-    // Sequential processing: strict serial loop prevents concurrent AI 429 rate-limit errors.
-    for (let i = 0; i < jobBatchForInference.length; i++) {
-      const jobListing = jobBatchForInference[i];
-      try {
-        const summarizedJob = await smartSummarizeJob(
-          jobListing,
-          CANDIDATE_PROFILE,
-          language,
-          resolvedLocation,
-          searchIntent
-        );
-        if (summarizedJob) {
-          summarizedJobResults.push(summarizedJob);
-        }
-      } catch (inferenceError) {
-        logger.error(`AI pipeline failed for job "${jobListing.title}": ${inferenceError.message}`);
-      }
-
-      // Mandatory 5000ms inter-call throttle delay to respect AI provider rate limits on larger batches.
-      if (i < jobBatchForInference.length - 1) {
-        logger.info(`Throttling: waiting 5000ms before next AI inference call...`);
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      }
-    }
+    const summarizedJobResults = await smartSummarizeJobBatch(
+      jobBatchForInference,
+      CANDIDATE_PROFILE,
+      language,
+      resolvedLocation,
+      searchIntent
+    );
 
     // Filter out malformed or placeholder job entries before caching.
     const inferencePayload = summarizedJobResults.filter(

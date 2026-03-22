@@ -19,15 +19,14 @@ You will receive:
     "reply"       → draft a formal reply
     "grievance"   → draft a grievance/complaint letter
     "rti"         → draft an RTI (Right to Information) request
-- **language**: Target language (en, kn, hi)
 
 ### Strict Output Format
 Return **only** valid JSON — no markdown fences, no extra text.
 
 {
-  "draftLetter": "<the complete draft letter with proper formatting, date placeholder, address blocks>",
-  "draftLetterKannada": "<Kannada version if language is kn, else empty string>",
-  "draftLetterHindi": "<Hindi version if language is hi, else empty string>",
+  "draftLetter": "To,[NEWLINE]The Relevant Authority,[NEWLINE][NEWLINE][Date][NEWLINE][NEWLINE]Subject: [Subject here][NEWLINE][NEWLINE]Sir/Madam,[NEWLINE][NEWLINE][First paragraph here...][NEWLINE][NEWLINE][Second paragraph here...][NEWLINE][NEWLINE]Yours faithfully,[NEWLINE][Name]",
+  "draftLetterKannada": "ಗೆ,[NEWLINE]ಸಂಬಂಧಪಟ್ಟ ಅಧಿಕಾರಿಗಳು,[NEWLINE][NEWLINE][ದಿನಾಂಕ][NEWLINE][NEWLINE]ವಿಷಯ: [ಇಲ್ಲಿ ವಿಷಯ][NEWLINE][NEWLINE]ಮಾನ್ಯರೆ,[NEWLINE][NEWLINE][ಬರೆವಣಿಗೆ...][NEWLINE][NEWLINE]ತಮ್ಮ ನಂಬುಗೆಯ,[NEWLINE][ಹೆಸರು]",
+  "draftLetterHindi": "सेवा में,[NEWLINE]संबंधित प्राधिकारी,[NEWLINE][NEWLINE][दिनांक][NEWLINE][NEWLINE]विषय: [यहाँ विषय][NEWLINE][NEWLINE]महोदय/महोदया,[NEWLINE][NEWLINE][पत्र का विवरण...][NEWLINE][NEWLINE]भवदीय,[NEWLINE][नाम]",
   "formatType": "reply | grievance | rti",
   "tips": [
     "<practical tip 1 for the user>",
@@ -39,10 +38,9 @@ Return **only** valid JSON — no markdown fences, no extra text.
 
 ### Rules
 - Do NOT wrap JSON in markdown code fences.
-- The letter must include: Date placeholder [DATE], From/To address blocks,
-  Subject line, Body, and Closing.
-- For RTI, follow the standard RTI Act 2005 format.
-- Keep the language simple but formally correct.
+- MUST use the literal text "[NEWLINE]" wherever you want a line break or paragraph spacing. DO NOT use actual newlines or \\n/\\n\\n characters in the JSON strings.
+- You MUST provide ALL THREE languages (English, Kannada, Hindi). They must never be empty.
+- NEVER mix English letters or words inside the Kannada or Hindi drafts.
 - Include 2-4 practical tips.
 - Always include the disclaimer.
 `;

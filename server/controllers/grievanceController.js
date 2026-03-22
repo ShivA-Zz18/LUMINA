@@ -7,7 +7,7 @@
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { Groq } = require("groq-sdk");
-const { HfInference } = require("@huggingface/inference");
+const OpenAI = require("openai");
 const GRIEVANCE_DRAFTSMAN_PROMPT = require("../prompts/grievanceDraftsman");
 
 // ═══════════════════════════════════════════════════════════
@@ -19,7 +19,19 @@ function extractJSON(text) {
       .replace(/```json\s*/gi, "")
       .replace(/```\s*/g, "")
       .trim();
-    return JSON.parse(cleaned);
+    const parsed = JSON.parse(cleaned);
+    
+    // Replace [NEWLINE] markers with actual \n characters for rendering safely
+    if (typeof parsed.draftLetter === 'string') parsed.draftLetter = parsed.draftLetter.replace(/\[NEWLINE\]/g, "\n");
+    if (typeof parsed.draftLetterKannada === 'string') parsed.draftLetterKannada = parsed.draftLetterKannada.replace(/\[NEWLINE\]/g, "\n");
+    if (typeof parsed.draftLetterHindi === 'string') parsed.draftLetterHindi = parsed.draftLetterHindi.replace(/\[NEWLINE\]/g, "\n");
+    
+    // Fallback for previous array implementations just in case
+    if (Array.isArray(parsed.draftLetter)) parsed.draftLetter = parsed.draftLetter.join("\n");
+    if (Array.isArray(parsed.draftLetterKannada)) parsed.draftLetterKannada = parsed.draftLetterKannada.join("\n");
+    if (Array.isArray(parsed.draftLetterHindi)) parsed.draftLetterHindi = parsed.draftLetterHindi.join("\n");
+    
+    return parsed;
   } catch {
     return null;
   }
@@ -30,15 +42,17 @@ function extractJSON(text) {
 // ═══════════════════════════════════════════════════════════
 function validateAPIKeys() {
   const keys = {
+    github: process.env.GITHUB_TOKEN,
+    openrouter: process.env.OPENROUTER_API_KEY,
     gemini: process.env.GEMINI_API_KEY,
     groq: process.env.GROQ_API_KEY,
-    huggingface: process.env.HUGGINGFACE_API_KEY,
   };
 
   const available = [];
+  if (keys.github) available.push("github");
+  if (keys.openrouter) available.push("openrouter");
   if (keys.gemini && keys.gemini !== "your_gemini_api_key_here") available.push("gemini");
   if (keys.groq && keys.groq !== "your_groq_api_key_here") available.push("groq");
-  if (keys.huggingface && keys.huggingface !== "your_huggingface_api_key_here") available.push("huggingface");
 
   console.log(`✓ Available AI providers: ${available.join(", ") || "NONE - using demo mode"}`);
   return { keys, available };
@@ -110,36 +124,77 @@ async function tryGroq(userMessage) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// PROVIDER 3: HuggingFace (with explicit provider configuration)
+// PROVIDER 3: OpenRouter (Deep-Language Gemini Backdoor)
 // ═══════════════════════════════════════════════════════════
-async function tryHuggingFace(userMessage) {
+async function tryOpenRouter(userMessage) {
   try {
-    console.log("📡 Attempting HuggingFace...");
-    const apiKey = process.env.HUGGINGFACE_API_KEY;
-    if (!apiKey) throw new Error("HUGGINGFACE_API_KEY not set");
+    console.log("📡 Attempting OpenRouter (Gemini 2.0 Flash Lite)...");
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) throw new Error("OPENROUTER_API_KEY not set");
 
-    const client = new HfInference(apiKey);
-
-    // Use explicit model with better support
-    const response = await client.textGeneration({
-      model: "mistralai/Mistral-7B-Instruct-v0.2",
-      inputs: `${GRIEVANCE_DRAFTSMAN_PROMPT}\n\nUser Query: ${userMessage}`,
-      parameters: {
-        max_new_tokens: 1024,
-        temperature: 0.7,
-        do_sample: true,
-      },
+    const openRouterClient = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: apiKey,
     });
 
-    const responseText = response.generated_text;
+    const response = await openRouterClient.chat.completions.create({
+      model: "google/gemini-2.0-flash-lite-preview-02-05:free",
+      messages: [
+        { role: "system", content: GRIEVANCE_DRAFTSMAN_PROMPT },
+        { role: "user", content: userMessage },
+      ],
+      response_format: { type: 'json_object' }, // Enforce JSON mode
+      temperature: 0.7,
+      max_tokens: 2048,
+    });
+
+    const responseText = response.choices[0]?.message?.content || "{}";
     const parsed = extractJSON(responseText);
 
     if (parsed) {
-      console.log("✓ HuggingFace succeeded!");
-      return { success: true, data: parsed, provider: "HuggingFace" };
+      console.log("✓ OpenRouter succeeded!");
+      return { success: true, data: parsed, provider: "OpenRouter Gemini" };
     }
   } catch (error) {
-    console.error(`⚠️ HuggingFace failed: ${error.message}`);
+    console.error(`⚠️ OpenRouter failed: ${error.message}`);
+  }
+  return { success: false };
+}
+
+// ═══════════════════════════════════════════════════════════
+// PROVIDER 4: GitHub Models API (Azure GPT-4o-mini)
+// ═══════════════════════════════════════════════════════════
+async function tryGitHubModels(userMessage) {
+  try {
+    console.log("📡 Attempting GitHub Models (GPT-4o-mini)...");
+    const apiKey = process.env.GITHUB_TOKEN;
+    if (!apiKey) throw new Error("GITHUB_TOKEN not set");
+
+    const githubClient = new OpenAI({
+      baseURL: 'https://models.inference.ai.azure.com',
+      apiKey: apiKey,
+    });
+
+    const response = await githubClient.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: GRIEVANCE_DRAFTING_PROMPT },
+        { role: "user", content: userMessage },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.7,
+      max_tokens: 2048,
+    });
+
+    const responseText = response.choices[0]?.message?.content || "{}";
+    const parsed = extractJSON(responseText);
+
+    if (parsed) {
+      console.log("✓ GitHub Models succeeded!");
+      return { success: true, data: parsed, provider: "GitHub Models (GPT-4o-mini)" };
+    }
+  } catch (error) {
+    console.error(`⚠️ GitHub Models failed: ${error.message}`);
   }
   return { success: false };
 }
@@ -207,16 +262,31 @@ Document Context:
 ${documentContext}
 
 User Intent: ${userIntent}
-Target Language: ${language || "en"}
 
-Please draft the appropriate formal letter based on the above context.
+Please draft the appropriate formal letter based on the above context in English, Kannada, and Hindi concurrently.
 Return ONLY valid JSON with fields: draftLetter, draftLetterKannada, draftLetterHindi, formatType, tips, disclaimer, submitTo
 `;
 
     // ─── RESILIENT FALLBACK CHAIN ───
-    // Try providers in order: Gemini → Groq → HuggingFace → Demo
+    // Try providers in order: GitHub Models → OpenRouter → Gemini SDK → Groq → Demo
 
-    // Step 1: Try Gemini
+    // Step 1: Try GitHub Models (Unlimited Quota, Highest Reliability)
+    if (envValidation.available.includes("github")) {
+      const result = await tryGitHubModels(userMessage);
+      if (result.success) {
+        return res.json({ success: true, data: result.data, provider: result.provider });
+      }
+    }
+
+    // Step 2: Try OpenRouter (Bypass Gemini limit)
+    if (envValidation.available.includes("openrouter")) {
+      const result = await tryOpenRouter(userMessage);
+      if (result.success) {
+        return res.json({ success: true, data: result.data, provider: result.provider });
+      }
+    }
+
+    // Step 3: Try Gemini SDK
     if (envValidation.available.includes("gemini")) {
       const result = await tryGemini(userMessage);
       if (result.success) {
@@ -224,17 +294,9 @@ Return ONLY valid JSON with fields: draftLetter, draftLetterKannada, draftLetter
       }
     }
 
-    // Step 2: Try Groq
+    // Step 4: Try Groq
     if (envValidation.available.includes("groq")) {
       const result = await tryGroq(userMessage);
-      if (result.success) {
-        return res.json({ success: true, data: result.data, provider: result.provider });
-      }
-    }
-
-    // Step 3: Try HuggingFace
-    if (envValidation.available.includes("huggingface")) {
-      const result = await tryHuggingFace(userMessage);
       if (result.success) {
         return res.json({ success: true, data: result.data, provider: result.provider });
       }

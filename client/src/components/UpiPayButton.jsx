@@ -18,7 +18,7 @@ export default function UpiPayButton({ payeeName, payeeVPA, amount, note }) {
     pn: payeeName || "Government",
     am: amount.toFixed(2),
     cu: "INR",
-    tn: note || `Lingo-Bridge: ${payeeName} fee`,
+    tn: note || `Lumina: ${payeeName} fee`,
   });
   const upiLink = `upi://pay?${params.toString()}`;
 

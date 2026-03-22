@@ -29,3 +29,8 @@ npm-debug.log*
 
 # Gemini agent
 .gemini/
+
+# Exclude documentation files per user request
+*.md
+*.txt
+!README.md

@@ -189,7 +189,18 @@ const JobCard = ({ job, index, currentLanguage }) => {
 
 export default function JobFinder() {
   const [keyword, setKeyword] = useState("");
-  const [language, setLanguage] = useState("English");
+  const getFullLangName = (shortCode) => {
+    if (shortCode === "hi") return "Hindi";
+    if (shortCode === "kn") return "Kannada";
+    return "English";
+  };
+  const [language, setLanguage] = useState(getFullLangName(localStorage.getItem("lingo_lang") || "en"));
+
+  useEffect(() => {
+    const handleLangChange = (e) => setLanguage(getFullLangName(e.detail));
+    window.addEventListener("lingo_lang_change", handleLangChange);
+    return () => window.removeEventListener("lingo_lang_change", handleLangChange);
+  }, []);
   const [location, setLocation] = useState("Global");
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -215,7 +226,6 @@ export default function JobFinder() {
     }
   };
 
-  useEffect(() => { fetchJobs(); }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -294,7 +304,12 @@ export default function JobFinder() {
             <div className="w-[1px] bg-white/10 hidden sm:block my-2" />
             <select 
               value={language} 
-              onChange={(e) => setLanguage(e.target.value)}
+              onChange={(e) => {
+                setLanguage(e.target.value);
+                const shortCode = e.target.value === "Hindi" ? "hi" : e.target.value === "Kannada" ? "kn" : "en";
+                localStorage.setItem("lingo_lang", shortCode);
+                window.dispatchEvent(new CustomEvent("lingo_lang_change", { detail: shortCode }));
+              }}
               className="sm:w-[150px] bg-transparent border-none px-4 py-4 text-white/80 focus:text-white font-medium focus:outline-none appearance-none cursor-pointer"
             >
               {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}

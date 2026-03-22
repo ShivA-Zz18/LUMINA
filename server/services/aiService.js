@@ -2,6 +2,7 @@
 
 const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { Groq } = require('groq-sdk');
 const logger = require('../utils/logger');
 require('dotenv').config();
 
@@ -16,7 +17,13 @@ const openRouterClient = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
+const githubModelsClient = process.env.GITHUB_TOKEN ? new OpenAI({
+  baseURL: 'https://models.inference.ai.azure.com',
+  apiKey: process.env.GITHUB_TOKEN,
+}) : null;
+
 const geminiClient = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const groqClient = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
 
 /**
  * Prioritized list of OpenRouter free-tier models to attempt in sequence.
@@ -74,9 +81,40 @@ const callAIPipeline = async (
   modelName = null,
   maxRetries = 3
 ) => {
+  let lastProviderError = null;
+
+  // ── 0. Try GitHub Models (Unlimited Quota, Highest Reliability) ────────
+  if (githubModelsClient) {
+    try {
+      const githubCompletion = await githubModelsClient.chat.completions.create({
+        messages: [{ role: 'user', content: aiInferencePrompt }],
+        model: 'gpt-4o-mini',
+        response_format: { type: 'json_object' },
+      });
+      return JSON.parse(githubCompletion.choices[0]?.message?.content || '{}');
+    } catch (githubError) {
+      logger.warn(`GitHub Models primary inference failed: ${githubError.message}. Falling back to Groq...`);
+      lastProviderError = githubError;
+    }
+  }
+
+  // ── 1. Try Groq (High Speed Llama) ───────────────────────────────────────
+  if (groqClient) {
+    try {
+      const groqCompletion = await groqClient.chat.completions.create({
+        messages: [{ role: 'user', content: aiInferencePrompt }],
+        model: 'llama-3.3-70b-versatile',
+        response_format: { type: 'json_object' },
+      });
+      return JSON.parse(groqCompletion.choices[0]?.message?.content || '{}');
+    } catch (groqError) {
+      logger.warn(`Groq inference failed: ${groqError.message}. Falling back to OpenRouter...`);
+      lastProviderError = groqError;
+    }
+  }
+
   // Use the caller's model if specified, otherwise walk the full priority list.
   const modelsToAttempt = modelName ? [modelName] : [...FREE_TIER_MODEL_PRIORITY_LIST];
-  let lastProviderError = null;
 
   for (const currentModel of modelsToAttempt) {
     // ── Per-model attempt with exponential backoff for rate-limit errors ──
@@ -138,47 +176,36 @@ const callAIPipeline = async (
   }
 };
 
-/**
- * Generates a multilingual, eligibility-scored job summary for a given job listing.
- *
- * @async
- * @param {Object} jobData - Raw job object from the scraper/aggregator.
- * @param {string} jobData.title - The job title.
- * @param {string} [jobData.description] - Full job description text.
- * @param {string} [jobData.qualifications] - Required qualifications string.
- * @param {string} [jobData.sector] - Job sector (e.g., 'Government', 'Private').
- * @param {string} [jobData.source] - Source website name.
- * @param {string} [jobData.url] - Direct application link.
- * @param {string} [jobData.last_date] - Application deadline.
- * @param {Object} candidateProfile - The user's academic and skill profile for eligibility matching.
- * @param {string} candidateProfile.degree - Candidate's highest degree.
- * @param {string[]} candidateProfile.skills - List of candidate's technical skills.
- * @param {string} candidateProfile.preferredRole - Candidate's preferred job role.
- * @param {string} [userLanguage='English'] - The user's preferred display language.
- * @param {string} [userLocation='Karnataka'] - The user's geographic location.
- * @param {string} [searchIntent=''] - The original search query (primary eligibility scoring factor).
- * @returns {Promise<Object>} AI-generated job summary object, or a graceful degradation stub on failure.
- */
-const smartSummarizeJob = async (
-  jobData,
+const smartSummarizeJobBatch = async (
+  jobDataArray,
   candidateProfile,
   userLanguage = 'English',
   userLocation = 'Karnataka',
   searchIntent = ''
 ) => {
-  const jobTextCorpus = (
-    `${jobData.title} ${jobData.description || ''} ${jobData.qualifications || ''}`
-  ).toLowerCase();
-
+  if (!jobDataArray || jobDataArray.length === 0) return [];
+  
   const KARNATAKA_REGION_KEYWORDS = ['karnataka', 'bangalore', 'mangalore', 'udupi', 'dakshina kannada'];
-  const localAdvantageTag =
-    KARNATAKA_REGION_KEYWORDS.some((kw) => jobTextCorpus.includes(kw)) || userLocation !== 'Global'
-      ? 'Karnataka Region Role'
-      : null;
+  
+  const jobsListStr = jobDataArray.map((job, idx) => {
+    const jobTextCorpus = (`${job.title} ${job.description || ''} ${job.qualifications || ''}`).toLowerCase();
+    const localAdvantageTag = KARNATAKA_REGION_KEYWORDS.some((kw) => jobTextCorpus.includes(kw)) || userLocation !== 'Global'
+        ? 'Karnataka Region Role' : null;
+    
+    return `[JOB ${idx}]
+Title: ${job.title || 'N/A'}
+Sector: ${job.sector || 'Private'}
+Source: ${job.source || 'N/A'}
+Qualifications: ${job.qualifications || 'N/A'}
+URL: ${job.url || ''}
+Last Date: ${job.last_date || 'Not Specified'}
+Local Advantage: ${localAdvantageTag || 'None'}
+Description: ${job.description || 'N/A'}`;
+  }).join('\n\n');
 
   const aiInferencePrompt = `
     You are an expert career counselor in India.
-    Analyze the following job details against the User's Search Intent and Profile, then provide a structured JSON response.
+    Analyze the following list of ${jobDataArray.length} jobs against the User's Search Intent and Profile, then provide a structured JSON ARRAY response.
 
     [USER SEARCH INTENT]
     Search Query: "${searchIntent}"
@@ -189,60 +216,70 @@ const smartSummarizeJob = async (
     Preferred Role: ${candidateProfile.preferredRole || 'Any Entry Level'}
     Location: ${userLocation}
 
-    [JOB DETAILS]
-    Job Title: ${jobData.title || 'N/A'}
-    Sector: ${jobData.sector || 'Private'}
-    Source: ${jobData.source || 'N/A'}
-    Qualifications required: ${jobData.qualifications || 'N/A'}
-    Job Description: ${jobData.description || 'N/A'}
+    [JOBS LIST]
+    ${jobsListStr}
 
     [LOGIC INSTRUCTIONS]
-    1. Calculate an "eligibility_score" (0-100). The HIGHEST scoring factor is match with the Search Query ("${searchIntent}"). Scores 90-100 for strong match, below 40 for a mismatch.
+    1. For EVERY job in the list (0 to ${jobDataArray.length - 1}), calculate an "eligibility_score" (0-100). The HIGHEST scoring factor is match with the Search Query.
     2. Write a 2-sentence summary simultaneously in ALL THREE LANGUAGES: English, Hindi, and Kannada.
-    3. PIVOT DETECTION: If the job is in a completely different industry than the user's profile, include the phrase "You are eligible, but this is a career pivot" in all three summaries natively.
+    3. PIVOT DETECTION: If the job is in a completely different industry than the user's profile, include the phrase "You are eligible, but this is a career pivot" in all three summaries.
 
     Return ONLY a valid JSON object with EXACTLY this schema:
     {
-      "title": "<Extract actual job title here>",
-      "eligibility_score": <number 0-100>,
-      "summary_english": "<2-sentence summary strictly in English>",
-      "summary_hindi": "<2-sentence summary strictly in Hindi>",
-      "summary_kannada": "<2-sentence summary strictly in Kannada>",
-      "apply_link": "${jobData.url || ''}",
-      "last_date": "${jobData.last_date || 'Not Specified'}",
-      "source_reliability_rating": "High/Medium/Low",
-      "local_advantage": ${localAdvantageTag ? `"${localAdvantageTag}"` : 'null'},
-      "sector": "${jobData.sector || 'Private'}"
+      "summarized_jobs": [
+        {
+          "id": <Job Index Number>,
+          "title": "<Actual job title>",
+          "eligibility_score": <number 0-100>,
+          "summary_english": "<2-sentence summary strictly in English>",
+          "summary_hindi": "<2-sentence summary strictly in Hindi>",
+          "summary_kannada": "<2-sentence summary strictly in Kannada>",
+          "apply_link": "<URL>",
+          "last_date": "<Last Date>",
+          "source_reliability_rating": "High/Medium/Low",
+          "local_advantage": "<local advantage tag if any, else null>",
+          "sector": "<Sector>"
+        }
+      ]
     }
   `;
 
   try {
-    const extractedJobMetadata = await callAIPipeline(aiInferencePrompt);
-
-    if (!extractedJobMetadata.local_advantage && localAdvantageTag) {
-      extractedJobMetadata.local_advantage = localAdvantageTag;
-    }
-    if (extractedJobMetadata.title === '<Extract actual job title here>') {
-      extractedJobMetadata.title = jobData.title;
-    }
-
-    return extractedJobMetadata;
+    const extractedData = await callAIPipeline(aiInferencePrompt);
+    const results = extractedData.summarized_jobs || [];
+    
+    // Map outputs back to fallback fields if missing
+    return jobDataArray.map((job, idx) => {
+      const summary = results.find(r => r.id === idx) || {};
+      return {
+        title: summary.title && summary.title !== '<Actual job title>' ? summary.title : job.title,
+        eligibility_score: summary.eligibility_score || 50,
+        summary_english: summary.summary_english || 'Summary unavailable',
+        summary_hindi: summary.summary_hindi || 'Summary unavailable',
+        summary_kannada: summary.summary_kannada || 'Summary unavailable',
+        apply_link: summary.apply_link || job.url,
+        last_date: summary.last_date || job.last_date || 'Not Specified',
+        source_reliability_rating: summary.source_reliability_rating || 'Medium',
+        local_advantage: summary.local_advantage || null,
+        sector: summary.sector || job.sector || 'Private',
+      };
+    });
   } catch (pipelineError) {
-    logger.error(`smartSummarizeJob failed for "${jobData.title}": ${pipelineError.message}`);
-
-    return {
-      title: jobData.title,
+    logger.error(`smartSummarizeJobBatch failed: ${pipelineError.message}`);
+    // Fallback: return unsummarized basic jobs
+    return jobDataArray.map((job) => ({
+      title: job.title,
       eligibility_score: 50,
       summary_english: 'Summary unavailable',
       summary_hindi: 'Summary unavailable',
       summary_kannada: 'Summary unavailable',
-      apply_link: jobData.url,
-      last_date: jobData.last_date || 'Not Specified',
+      apply_link: job.url,
+      last_date: job.last_date || 'Not Specified',
       source_reliability_rating: 'Medium',
-      local_advantage: localAdvantageTag,
-      sector: jobData.sector || 'Private',
-    };
+      local_advantage: null,
+      sector: job.sector || 'Private',
+    }));
   }
 };
 
-module.exports = { smartSummarizeJob };
+module.exports = { smartSummarizeJobBatch };
